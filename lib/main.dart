@@ -275,21 +275,20 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  // الحل الجذري: جلب كل الفواتير وتصفيتها محلياً
   Widget _buildBillsList({required bool showAll}) {
     final userId = Supabase.instance.client.auth.currentUser?.id;
-    
-    // تصحيح الخطأ: تطبيق الفلتر قبل تحويله إلى Stream
-    var query = Supabase.instance.client.from('bills');
-    if (!showAll) {
-      query = query.eq('user_id', userId!);
-    }
-    final stream = query.stream(primaryKey: ['id']).order('created_at', ascending: false);
+    final stream = Supabase.instance.client.from('bills').stream(primaryKey: ['id']).order('created_at', ascending: false);
 
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: stream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final bills = snapshot.data!;
+        
+        List<Map<String, dynamic>> allBills = snapshot.data!;
+        List<Map<String, dynamic>> bills = showAll 
+            ? allBills 
+            : allBills.where((bill) => bill['user_id'] == userId).toList();
         
         if (bills.isEmpty && showAll) return const Center(child: Text('لا توجد فواتير حالياً.'));
         if (bills.isEmpty && !showAll) return _buildUploadCard();
@@ -502,10 +501,14 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: Supabase.instance.client.from('chats').stream(primaryKey: ['id']).eq('bill_id', widget.bill['id']).order('created_at'),
+              // الحل الجذري هنا أيضاً: جلب كل الرسائل وتصفيتها محلياً
+              stream: Supabase.instance.client.from('chats').stream(primaryKey: ['id']).order('created_at'),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                final messages = snapshot.data!;
+                
+                List<Map<String, dynamic>> allMessages = snapshot.data!;
+                final messages = allMessages.where((msg) => msg['bill_id'] == widget.bill['id']).toList();
+
                 if (messages.isEmpty) return const Center(child: Text('لا توجد رسائل بعد. ابدأ المحادثة!'));
 
                 return ListView.builder(
