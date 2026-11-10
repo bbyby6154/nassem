@@ -159,9 +159,7 @@ class _MainScreenState extends State<MainScreen> {
         ),
         body: TabBarView(
           children: [
-            // التبويب الأول: كل الفواتير
             _buildBillsList(showAll: true),
-            // التبويب الثاني: فواتير المستخدم الحالي
             _buildBillsList(showAll: false),
           ],
         ),
@@ -171,25 +169,27 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildBillsList({required bool showAll}) {
     final userId = Supabase.instance.client.auth.currentUser?.id;
-    var query = Supabase.instance.client.from('bills').select();
     
-    // إذا كان التبويب الثاني، نجلب فواتير المستخدم فقط
+    // إصلاح الخطأ هنا: بناء الاستعلام بشكل صحيح
+    var query = Supabase.instance.client.from('bills').stream(primaryKey: ['id']).order('created_at', ascending: false);
+    
     if (!showAll) {
       query = query.eq('user_id', userId!);
     }
 
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: query.order('created_at', ascending: false).stream(primaryKey: ['id']),
+      stream: query,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final bills = snapshot.data!;
-        if (bills.isEmpty) return Center(child: Text(showAll ? 'لا توجد فواتير حالياً.' : 'لم تقم برفع أي فواتير بعد.'));
+        
+        if (bills.isEmpty && showAll) return const Center(child: Text('لا توجد فواتير حالياً.'));
+        if (bills.isEmpty && !showAll) return _buildUploadCard(); // إظهار نموذج الرفع فقط إذا لم تكن هناك فواتير
 
         return ListView.builder(
           padding: const EdgeInsets.all(8),
-          itemCount: bills.length + (!showAll ? 1 : 0), // إضافة نموذج الرفع في التبويب الثاني فقط
+          itemCount: bills.length + (!showAll ? 1 : 0),
           itemBuilder: (context, index) {
-            // نموذج رفع الفاتورة (يظهر فقط في تبويب "فواتيري")
             if (!showAll && index == 0) {
               return _buildUploadCard();
             }
@@ -368,7 +368,6 @@ class _ChatPageState extends State<ChatPage> {
           ],
         ),
         actions: [
-          // زر اتصال سريع برقم الهاتف
           if (widget.bill['phone_number'] != null && widget.bill['phone_number'].toString().isNotEmpty)
             IconButton(
               icon: const Icon(Icons.call),
@@ -415,7 +414,6 @@ class _ChatPageState extends State<ChatPage> {
               },
             ),
           ),
-          // شريط كتابة الرسالة
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
