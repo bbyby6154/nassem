@@ -28,7 +28,6 @@ class NassemApp extends StatelessWidget {
   }
 }
 
-// راوتر ذكي يوجه المستخدم حسب حالته
 class SplashRouter extends StatefulWidget {
   const SplashRouter({super.key});
   @override
@@ -71,7 +70,6 @@ class _SplashRouterState extends State<SplashRouter> {
   }
 }
 
-// ================= شاشة تسجيل الدخول =================
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
   @override
@@ -166,7 +164,6 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-// ================= شاشة الإعلانات الإجبارية (عند التسجيل) =================
 class AdOnboardingScreen extends StatefulWidget {
   const AdOnboardingScreen({super.key});
   @override
@@ -234,7 +231,6 @@ class _AdOnboardingScreenState extends State<AdOnboardingScreen> {
   }
 }
 
-// ================= الشاشة الرئيسية =================
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
   @override
@@ -242,6 +238,24 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  final amountController = TextEditingController();
+  final descController = TextEditingController();
+  final phoneController = TextEditingController();
+  final shamController = TextEditingController();
+  File? receiptImage;
+  File? shamImage;
+  bool isUploading = false;
+  int uploadAdsWatched = 0;
+
+  @override
+  void dispose() {
+    amountController.dispose();
+    descController.dispose();
+    phoneController.dispose();
+    shamController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -275,7 +289,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // الحل الجذري: جلب كل الفواتير وتصفيتها محلياً
   Widget _buildBillsList({required bool showAll}) {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     final stream = Supabase.instance.client.from('bills').stream(primaryKey: ['id']).order('created_at', ascending: false);
@@ -326,130 +339,115 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // ================= نموذج الرفع (يطلب 5 إعلانات) =================
   Widget _buildUploadCard() {
-    final amountController = TextEditingController();
-    final descController = TextEditingController();
-    final phoneController = TextEditingController();
-    final shamController = TextEditingController();
-    File? receiptImage;
-    File? shamImage;
-    bool isUploading = false;
-    int uploadAdsWatched = 0;
-
-    return StatefulBuilder(
-      builder: (context, setModalState) {
-        
-        Future<void> watchUploadAd() async {
-          if (uploadAdsWatched >= 5) return;
-          final Uri url = Uri.parse(adsterraSmartlink);
-          if (await launchUrl(url, mode: LaunchMode.externalApplication)) {
-            setModalState(() => uploadAdsWatched++);
-          }
-        }
-
-        return Card(
-          elevation: 4,
-          margin: const EdgeInsets.all(8),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.all(8),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            const Text('أضف فاتورتك أو دينك', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Row(
               children: [
-                const Text('أضف فاتورتك أو دينك', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () async {
-                          final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-                          if (picked != null) setModalState(() => receiptImage = File(picked.path));
-                        },
-                        child: Container(
-                          height: 100, color: Colors.grey[200],
-                          child: receiptImage != null ? Image.file(receiptImage!, fit: BoxFit.cover) : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long), Text('صورة الفاتورة')]),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () async {
-                          final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-                          if (picked != null) setModalState(() => shamImage = File(picked.path));
-                        },
-                        child: Container(
-                          height: 100, color: Colors.grey[200],
-                          child: shamImage != null ? Image.file(shamImage!, fit: BoxFit.cover) : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.qr_code), Text('كود شام كاش')]),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المبلغ المطلوب')),
-                TextField(controller: descController, decoration: const InputDecoration(labelText: 'وصف الدين')),
-                TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'رقم الهاتف')),
-                TextField(controller: shamController, decoration: const InputDecoration(labelText: 'رقم شام كاش')),
-                const SizedBox(height: 15),
-                
-                if (uploadAdsWatched < 5)
-                  ElevatedButton.icon(
-                    onPressed: watchUploadAd,
-                    icon: const Icon(Icons.play_circle_fill),
-                    label: Text('يجب مشاهدة 5 إعلانات لفتح الرفع ($uploadAdsWatched/5)'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
-                  )
-                else
-                  ElevatedButton(
-                    onPressed: isUploading ? null : () async {
-                      if (receiptImage == null || amountController.text.isEmpty) return;
-                      setModalState(() => isUploading = true);
-                      try {
-                        final user = Supabase.instance.client.auth.currentUser;
-                        final path = '${user!.id}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-                        await Supabase.instance.client.storage.from('bills').upload(path, receiptImage!);
-                        final url = Supabase.instance.client.storage.from('bills').getPublicUrl(path);
-
-                        String? shamUrl;
-                        if (shamImage != null) {
-                          final shamPath = '${user.id}/sham_${DateTime.now().millisecondsSinceEpoch}.jpg';
-                          await Supabase.instance.client.storage.from('bills').upload(shamPath, shamImage!);
-                          shamUrl = Supabase.instance.client.storage.from('bills').getPublicUrl(shamPath);
-                        }
-
-                        await Supabase.instance.client.from('bills').insert({
-                          'user_id': user.id, 'amount': double.parse(amountController.text),
-                          'description': descController.text, 'phone_number': phoneController.text,
-                          'sham_cash_code': shamController.text, 'receipt_image_url': url, 'sham_cash_image_url': shamUrl,
-                        });
-                        
-                        setModalState(() { 
-                          uploadAdsWatched = 0; 
-                          receiptImage = null; 
-                          shamImage = null; 
-                        });
-                        amountController.clear(); descController.clear(); phoneController.clear(); shamController.clear();
-                        
-                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الرفع بنجاح')));
-                      } catch (e) {
-                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
-                      } finally {
-                        setModalState(() => isUploading = false);
-                      }
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () async {
+                      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+                      if (picked != null) setState(() => receiptImage = File(picked.path));
                     },
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
-                    child: isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text('رفع الفاتورة الآن'),
+                    child: Container(
+                      height: 100, color: Colors.grey[200],
+                      child: receiptImage != null ? Image.file(receiptImage!, fit: BoxFit.cover) : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long), Text('صورة الفاتورة')]),
+                    ),
                   ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () async {
+                      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+                      if (picked != null) setState(() => shamImage = File(picked.path));
+                    },
+                    child: Container(
+                      height: 100, color: Colors.grey[200],
+                      child: shamImage != null ? Image.file(shamImage!, fit: BoxFit.cover) : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.qr_code), Text('كود شام كاش')]),
+                    ),
+                  ),
+                ),
               ],
             ),
-          ),
-        );
-      },
+            TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المبلغ المطلوب')),
+            TextField(controller: descController, decoration: const InputDecoration(labelText: 'وصف الدين')),
+            TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'رقم الهاتف')),
+            TextField(controller: shamController, decoration: const InputDecoration(labelText: 'رقم شام كاش')),
+            const SizedBox(height: 15),
+            
+            if (uploadAdsWatched < 5)
+              ElevatedButton.icon(
+                onPressed: () async {
+                  if (uploadAdsWatched >= 5) return;
+                  final Uri url = Uri.parse(adsterraSmartlink);
+                  if (await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                    setState(() => uploadAdsWatched++);
+                  }
+                },
+                icon: const Icon(Icons.play_circle_fill),
+                label: Text('يجب مشاهدة 5 إعلانات لفتح الرفع ($uploadAdsWatched/5)'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
+              )
+            else
+              ElevatedButton(
+                onPressed: isUploading ? null : () async {
+                  if (receiptImage == null || amountController.text.isEmpty) return;
+                  setState(() => isUploading = true);
+                  try {
+                    final user = Supabase.instance.client.auth.currentUser;
+                    final path = '${user!.id}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+                    await Supabase.instance.client.storage.from('bills').upload(path, receiptImage!);
+                    final url = Supabase.instance.client.storage.from('bills').getPublicUrl(path);
+
+                    String? shamUrl;
+                    if (shamImage != null) {
+                      final shamPath = '${user.id}/sham_${DateTime.now().millisecondsSinceEpoch}.jpg';
+                      await Supabase.instance.client.storage.from('bills').upload(shamPath, shamImage!);
+                      shamUrl = Supabase.instance.client.storage.from('bills').getPublicUrl(shamPath);
+                    }
+
+                    await Supabase.instance.client.from('bills').insert({
+                      'user_id': user.id, 'amount': double.parse(amountController.text),
+                      'description': descController.text, 'phone_number': phoneController.text,
+                      'sham_cash_code': shamController.text, 'receipt_image_url': url, 'sham_cash_image_url': shamUrl,
+                    });
+                    
+                    setState(() { 
+                      uploadAdsWatched = 0; 
+                      receiptImage = null; 
+                      shamImage = null; 
+                      amountController.clear(); 
+                      descController.clear(); 
+                      phoneController.clear(); 
+                      shamController.clear();
+                    });
+                    
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الرفع بنجاح')));
+                  } catch (e) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+                  } finally {
+                    setState(() => isUploading = false);
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
+                child: isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text('رفع الفاتورة الآن'),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-// ================= شاشة الدردشة =================
 class ChatPage extends StatefulWidget {
   final Map<String, dynamic> bill;
   const ChatPage({super.key, required this.bill});
@@ -466,6 +464,12 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     isOwner = widget.bill['user_id'] == currentUserId;
+  }
+
+  @override
+  void dispose() {
+    _msgController.dispose();
+    super.dispose();
   }
 
   void _sendMessage() async {
@@ -501,7 +505,6 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
-              // الحل الجذري هنا أيضاً: جلب كل الرسائل وتصفيتها محلياً
               stream: Supabase.instance.client.from('chats').stream(primaryKey: ['id']).order('created_at'),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
