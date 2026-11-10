@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const String supabaseUrl = 'https://hihsyulcigbgjihmqafc.supabase.co';
 const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaHN5dWxjaWdiZ2ppaG1xYWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMzgxMjIsImV4cCI6MjEwOTgxNDEyMn0.gJnW41Ey6UF0LvNjCyR9sYyklNgtinWuncFJprPKIMY';
@@ -21,11 +22,52 @@ class NassemApp extends StatelessWidget {
     return MaterialApp(
       title: 'نسيم',
       theme: ThemeData(primarySwatch: Colors.teal, useMaterial3: true),
-      home: Supabase.instance.client.auth.currentSession == null
-          ? const AuthScreen()
-          : const MainScreen(),
+      home: const SplashRouter(),
       debugShowCheckedModeBanner: false,
     );
+  }
+}
+
+// راوتر ذكي يوجه المستخدم حسب حالته
+class SplashRouter extends StatefulWidget {
+  const SplashRouter({super.key});
+  @override
+  State<SplashRouter> createState() => _SplashRouterState();
+}
+
+class _SplashRouterState extends State<SplashRouter> {
+  @override
+  void initState() {
+    super.initState();
+    _checkStatus();
+  }
+
+  Future<void> _checkStatus() async {
+    await Future.delayed(const Duration(seconds: 1));
+    final session = Supabase.instance.client.auth.currentSession;
+    
+    if (session == null) {
+      _navigateTo(const AuthScreen());
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      bool hasWatchedAds = prefs.getBool('has_watched_ads_${session.user.id}') ?? false;
+      if (hasWatchedAds) {
+        _navigateTo(const MainScreen());
+      } else {
+        _navigateTo(const AdOnboardingScreen());
+      }
+    }
+  }
+
+  void _navigateTo(Widget page) {
+    if (mounted) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => page));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
 
@@ -64,7 +106,18 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         await Supabase.instance.client.auth.signUp(email: email, password: password);
       }
-      if (mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
+      
+      final prefs = await SharedPreferences.getInstance();
+      final user = Supabase.instance.client.auth.currentUser;
+      bool hasWatchedAds = prefs.getBool('has_watched_ads_${user?.id}') ?? false;
+      
+      if (mounted) {
+        if (hasWatchedAds) {
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
+        } else {
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AdOnboardingScreen()));
+        }
+      }
     } on AuthException catch (e) {
       if (mounted) {
         String msg = e.message;
@@ -113,14 +166,14 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-// ================= الشاشة الرئيسية (بتبويبين) =================
-class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+// ================= شاشة الإعلانات الإجبارية (عند التسجيل) =================
+class AdOnboardingScreen extends StatefulWidget {
+  const AdOnboardingScreen({super.key});
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  State<AdOnboardingScreen> createState() => _AdOnboardingScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _AdOnboardingScreenState extends State<AdOnboardingScreen> {
   int _adsWatched = 0;
 
   Future<void> _watchAd() async {
@@ -128,12 +181,67 @@ class _MainScreenState extends State<MainScreen> {
     final Uri url = Uri.parse(adsterraSmartlink);
     if (await launchUrl(url, mode: LaunchMode.externalApplication)) {
       setState(() => _adsWatched++);
+    }
+  }
+
+  Future<void> _finishOnboarding() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_watched_ads_${user.id}', true);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم احتساب الإعلان. تبقى ${5 - _adsWatched} إعلانات'), backgroundColor: Colors.teal));
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
       }
     }
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.monetization_on, size: 80, color: Colors.orange),
+              const SizedBox(height: 20),
+              const Text('خطوة أخيرة لتفعيل حسابك!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              const Text('لدعم استمرارية التطبيق المجاني، يرجى مشاهدة 5 إعلانات قصيرة لمرة واحدة فقط.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey)),
+              const SizedBox(height: 30),
+              Text('$_adsWatched / 5', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.teal)),
+              const SizedBox(height: 20),
+              if (_adsWatched < 5)
+                ElevatedButton.icon(
+                  onPressed: _watchAd,
+                  icon: const Icon(Icons.play_circle_fill),
+                  label: const Text('شاهد إعلان الآن'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
+                )
+              else
+                ElevatedButton.icon(
+                  onPressed: _finishOnboarding,
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text('تم! الدخول إلى التطبيق'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ================= الشاشة الرئيسية =================
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -169,8 +277,6 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildBillsList({required bool showAll}) {
     final userId = Supabase.instance.client.auth.currentUser?.id;
-    
-    // إصلاح الخطأ هنا: بناء الاستعلام بشكل صحيح
     var query = Supabase.instance.client.from('bills').stream(primaryKey: ['id']).order('created_at', ascending: false);
     
     if (!showAll) {
@@ -184,7 +290,7 @@ class _MainScreenState extends State<MainScreen> {
         final bills = snapshot.data!;
         
         if (bills.isEmpty && showAll) return const Center(child: Text('لا توجد فواتير حالياً.'));
-        if (bills.isEmpty && !showAll) return _buildUploadCard(); // إظهار نموذج الرفع فقط إذا لم تكن هناك فواتير
+        if (bills.isEmpty && !showAll) return _buildUploadCard();
 
         return ListView.builder(
           padding: const EdgeInsets.all(8),
@@ -208,10 +314,7 @@ class _MainScreenState extends State<MainScreen> {
                   icon: Icon(Icons.chat, color: isMyBill ? Colors.orange : Colors.teal),
                   tooltip: isMyBill ? 'الرد على المتبرعين' : 'مراسلة صاحب الفاتورة',
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => ChatPage(bill: bill)),
-                    );
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(bill: bill)));
                   },
                 ),
               ),
@@ -222,6 +325,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  // ================= نموذج الرفع (يطلب 5 إعلانات) =================
   Widget _buildUploadCard() {
     final amountController = TextEditingController();
     final descController = TextEditingController();
@@ -230,9 +334,21 @@ class _MainScreenState extends State<MainScreen> {
     File? receiptImage;
     File? shamImage;
     bool isUploading = false;
+    
+    // عداد إعلانات الرفع
+    int uploadAdsWatched = 0;
 
     return StatefulBuilder(
       builder: (context, setModalState) {
+        
+        Future<void> watchUploadAd() async {
+          if (uploadAdsWatched >= 5) return;
+          final Uri url = Uri.parse(adsterraSmartlink);
+          if (await launchUrl(url, mode: LaunchMode.externalApplication)) {
+            setModalState(() => uploadAdsWatched++);
+          }
+        }
+
         return Card(
           elevation: 4,
           margin: const EdgeInsets.all(8),
@@ -275,12 +391,14 @@ class _MainScreenState extends State<MainScreen> {
                 TextField(controller: descController, decoration: const InputDecoration(labelText: 'وصف الدين')),
                 TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'رقم الهاتف')),
                 TextField(controller: shamController, decoration: const InputDecoration(labelText: 'رقم شام كاش')),
-                const SizedBox(height: 10),
-                if (_adsWatched < 5)
+                const SizedBox(height: 15),
+                
+                // قسم الإعلانات الخاصة بالرفع
+                if (uploadAdsWatched < 5)
                   ElevatedButton.icon(
-                    onPressed: _watchAd,
+                    onPressed: watchUploadAd,
                     icon: const Icon(Icons.play_circle_fill),
-                    label: Text('يجب مشاهدة 5 إعلانات لفتح الرفع (${_adsWatched}/5)'),
+                    label: Text('يجب مشاهدة 5 إعلانات لفتح الرفع ($uploadAdsWatched/5)'),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
                   )
                 else
@@ -306,8 +424,15 @@ class _MainScreenState extends State<MainScreen> {
                           'description': descController.text, 'phone_number': phoneController.text,
                           'sham_cash_code': shamController.text, 'receipt_image_url': url, 'sham_cash_image_url': shamUrl,
                         });
-                        setModalState(() { _adsWatched = 0; receiptImage = null; shamImage = null; });
+                        
+                        // تصفير العداد بعد الرفع بنجاح
+                        setModalState(() { 
+                          uploadAdsWatched = 0; 
+                          receiptImage = null; 
+                          shamImage = null; 
+                        });
                         amountController.clear(); descController.clear(); phoneController.clear(); shamController.clear();
+                        
                         if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الرفع بنجاح')));
                       } catch (e) {
                         if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
@@ -316,7 +441,7 @@ class _MainScreenState extends State<MainScreen> {
                       }
                     },
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
-                    child: isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text('رفع الفاتورة'),
+                    child: isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text('رفع الفاتورة الآن'),
                   ),
               ],
             ),
@@ -327,7 +452,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// ================= شاشة الدردشة الكاملة =================
+// ================= شاشة الدردشة =================
 class ChatPage extends StatefulWidget {
   final Map<String, dynamic> bill;
   const ChatPage({super.key, required this.bill});
