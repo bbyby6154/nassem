@@ -277,14 +277,16 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildBillsList({required bool showAll}) {
     final userId = Supabase.instance.client.auth.currentUser?.id;
-    var query = Supabase.instance.client.from('bills').stream(primaryKey: ['id']).order('created_at', ascending: false);
     
+    // تصحيح الخطأ: تطبيق الفلتر قبل تحويله إلى Stream
+    var query = Supabase.instance.client.from('bills');
     if (!showAll) {
       query = query.eq('user_id', userId!);
     }
+    final stream = query.stream(primaryKey: ['id']).order('created_at', ascending: false);
 
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: query,
+      stream: stream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final bills = snapshot.data!;
@@ -334,8 +336,6 @@ class _MainScreenState extends State<MainScreen> {
     File? receiptImage;
     File? shamImage;
     bool isUploading = false;
-    
-    // عداد إعلانات الرفع
     int uploadAdsWatched = 0;
 
     return StatefulBuilder(
@@ -393,7 +393,6 @@ class _MainScreenState extends State<MainScreen> {
                 TextField(controller: shamController, decoration: const InputDecoration(labelText: 'رقم شام كاش')),
                 const SizedBox(height: 15),
                 
-                // قسم الإعلانات الخاصة بالرفع
                 if (uploadAdsWatched < 5)
                   ElevatedButton.icon(
                     onPressed: watchUploadAd,
@@ -425,7 +424,6 @@ class _MainScreenState extends State<MainScreen> {
                           'sham_cash_code': shamController.text, 'receipt_image_url': url, 'sham_cash_image_url': shamUrl,
                         });
                         
-                        // تصفير العداد بعد الرفع بنجاح
                         setModalState(() { 
                           uploadAdsWatched = 0; 
                           receiptImage = null; 
