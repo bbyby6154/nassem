@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 const String supabaseUrl = 'https://hihsyulcigbgjihmqafc.supabase.co';
 const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaHN5dWxjaWdiZ2ppaG1xYWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMzgxMjIsImV4cCI6MjEwOTgxNDEyMn0.gJnW41Ey6UF0LvNjCyR9sYyklNgtinWuncFJprPKIMY';
@@ -28,6 +27,7 @@ class NassemApp extends StatelessWidget {
   }
 }
 
+// راوتر ذكي يوجه المستخدم
 class SplashRouter extends StatefulWidget {
   const SplashRouter({super.key});
   @override
@@ -48,13 +48,8 @@ class _SplashRouterState extends State<SplashRouter> {
     if (session == null) {
       _navigateTo(const AuthScreen());
     } else {
-      final prefs = await SharedPreferences.getInstance();
-      bool hasWatchedAds = prefs.getBool('has_watched_ads_${session.user.id}') ?? false;
-      if (hasWatchedAds) {
-        _navigateTo(const MainScreen());
-      } else {
-        _navigateTo(const AdOnboardingScreen());
-      }
+      // الدخول الإجباري للإعلانات في كل مرة يفتح فيها التطبيق
+      _navigateTo(const EntryAdScreen());
     }
   }
 
@@ -70,6 +65,7 @@ class _SplashRouterState extends State<SplashRouter> {
   }
 }
 
+// ================= شاشة تسجيل الدخول =================
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
   @override
@@ -105,16 +101,9 @@ class _AuthScreenState extends State<AuthScreen> {
         await Supabase.instance.client.auth.signUp(email: email, password: password);
       }
       
-      final prefs = await SharedPreferences.getInstance();
-      final user = Supabase.instance.client.auth.currentUser;
-      bool hasWatchedAds = prefs.getBool('has_watched_ads_${user?.id}') ?? false;
-      
       if (mounted) {
-        if (hasWatchedAds) {
-          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
-        } else {
-          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AdOnboardingScreen()));
-        }
+        // التوجه لشاشة الإعلانات بعد التسجيل مباشرة
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const EntryAdScreen()));
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -164,13 +153,14 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-class AdOnboardingScreen extends StatefulWidget {
-  const AdOnboardingScreen({super.key});
+// ================= شاشة الإعلانات الإجبارية (عند كل دخول) =================
+class EntryAdScreen extends StatefulWidget {
+  const EntryAdScreen({super.key});
   @override
-  State<AdOnboardingScreen> createState() => _AdOnboardingScreenState();
+  State<EntryAdScreen> createState() => _EntryAdScreenState();
 }
 
-class _AdOnboardingScreenState extends State<AdOnboardingScreen> {
+class _EntryAdScreenState extends State<EntryAdScreen> {
   int _adsWatched = 0;
 
   Future<void> _watchAd() async {
@@ -181,14 +171,9 @@ class _AdOnboardingScreenState extends State<AdOnboardingScreen> {
     }
   }
 
-  Future<void> _finishOnboarding() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('has_watched_ads_${user.id}', true);
-      if (mounted) {
-        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
-      }
+  void _finishOnboarding() {
+    if (mounted) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
     }
   }
 
@@ -203,9 +188,9 @@ class _AdOnboardingScreenState extends State<AdOnboardingScreen> {
             children: [
               const Icon(Icons.monetization_on, size: 80, color: Colors.orange),
               const SizedBox(height: 20),
-              const Text('خطوة أخيرة لتفعيل حسابك!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text('أهلاً بك مجدداً!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
-              const Text('لدعم استمرارية التطبيق المجاني، يرجى مشاهدة 5 إعلانات قصيرة لمرة واحدة فقط.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey)),
+              const Text('لدعم استمرارية التطبيق، يرجى مشاهدة 5 إعلانات قصيرة لدخول التطبيق.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey)),
               const SizedBox(height: 30),
               Text('$_adsWatched / 5', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.teal)),
               const SizedBox(height: 20),
@@ -231,6 +216,7 @@ class _AdOnboardingScreenState extends State<AdOnboardingScreen> {
   }
 }
 
+// ================= الشاشة الرئيسية =================
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
   @override
@@ -256,6 +242,40 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
+  Future<void> _deleteBill(Map<String, dynamic> bill) async {
+    bool confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف الفاتورة'),
+        content: const Text('هل أنت متأكد من رغبتك في حذف هذه الفاتورة نهائياً؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('حذف', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        // 1. حذف الصور من التخزين (إن وجدت)
+        if (bill['receipt_image_url'] != null) {
+          final path = bill['receipt_image_url'].toString().split('/bills/').last;
+          await Supabase.instance.client.storage.from('bills').remove([path]);
+        }
+        if (bill['sham_cash_image_url'] != null) {
+          final path = bill['sham_cash_image_url'].toString().split('/bills/').last;
+          await Supabase.instance.client.storage.from('bills').remove([path]);
+        }
+        
+        // 2. حذف السجل من قاعدة البيانات (سيحذف المحادثات المرتبطة به تلقائياً)
+        await Supabase.instance.client.from('bills').delete().eq('id', bill['id']);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الفاتورة بنجاح')));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ في الحذف: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -265,8 +285,8 @@ class _MainScreenState extends State<MainScreen> {
           title: const Text('نسيم'),
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'كل الفواتير (للمتبرعين)', icon: Icon(Icons.list)),
-              Tab(text: 'فواتيري ورسائلي', icon: Icon(Icons.person)),
+              Tab(text: 'كل الفواتير', icon: Icon(Icons.list)),
+              Tab(text: 'فواتيري', icon: Icon(Icons.person)),
             ],
           ),
           actions: [
@@ -319,17 +339,71 @@ class _MainScreenState extends State<MainScreen> {
             final isMyBill = bill['user_id'] == userId;
 
             return Card(
-              child: ListTile(
-                leading: Image.network(bill['receipt_image_url'] ?? '', width: 60, height: 60, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image)),
-                title: Text('المبلغ: ${bill['amount']} ل.س', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('الحالة: ${bill['description'] ?? "غير محدد"}\nالهاتف: ${bill['phone_number'] ?? "غير متوفر"}'),
-                isThreeLine: true,
-                trailing: IconButton(
-                  icon: Icon(Icons.chat, color: isMyBill ? Colors.orange : Colors.teal),
-                  tooltip: isMyBill ? 'الرد على المتبرعين' : 'مراسلة صاحب الفاتورة',
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(bill: bill)));
-                  },
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Image.network(bill['receipt_image_url'] ?? '', width: 60, height: 60, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image)),
+                      title: Text('المبلغ: ${bill['amount']} ل.س', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('الحالة: ${bill['description'] ?? "غير محدد"}\nالهاتف: ${bill['phone_number'] ?? "غير متوفر"}'),
+                      isThreeLine: true,
+                      trailing: isMyBill 
+                        ? IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteBill(bill),
+                          )
+                        : null,
+                    ),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // التحقق من وجود رسائل لعرض الإشعار (Badge)
+                        FutureBuilder(
+                          future: Supabase.instance.client.from('chats').select('id').eq('bill_id', bill['id']).limit(1),
+                          builder: (context, snapshot) {
+                            bool hasMessages = snapshot.hasData && (snapshot.data as List).isNotEmpty;
+                            return Stack(
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(bill: bill)));
+                                  },
+                                  icon: Icon(isMyBill ? Icons.chat_bubble_outline : Icons.message),
+                                  label: Text(isMyBill ? 'الرد على الرسائل' : 'مراسلة صاحب الفاتورة'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isMyBill ? Colors.orange[50] : Colors.teal[50],
+                                    foregroundColor: isMyBill ? Colors.orange[900] : Colors.teal[900],
+                                  ),
+                                ),
+                                if (hasMessages)
+                                  Positioned(
+                                    right: 0,
+                                    top: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.mark_chat_unread, color: Colors.white, size: 12),
+                                    ),
+                                  )
+                              ],
+                            );
+                          }
+                        ),
+                        if (bill['phone_number'] != null && bill['phone_number'].toString().isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.call, color: Colors.teal),
+                            onPressed: () => launchUrl(Uri.parse('tel:${bill['phone_number']}')),
+                            tooltip: 'اتصال هاتفي',
+                          )
+                      ],
+                    )
+                  ],
                 ),
               ),
             );
@@ -448,6 +522,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
+// ================= شاشة الدردشة =================
 class ChatPage extends StatefulWidget {
   final Map<String, dynamic> bill;
   const ChatPage({super.key, required this.bill});
@@ -493,13 +568,6 @@ class _ChatPageState extends State<ChatPage> {
             Text('فاتورة بقيمة ${widget.bill['amount']} ل.س', style: const TextStyle(fontSize: 12)),
           ],
         ),
-        actions: [
-          if (widget.bill['phone_number'] != null && widget.bill['phone_number'].toString().isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.call),
-              onPressed: () => launchUrl(Uri.parse('tel:${widget.bill['phone_number']}')),
-            )
-        ],
       ),
       body: Column(
         children: [
