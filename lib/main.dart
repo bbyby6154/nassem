@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 const String supabaseUrl = 'https://hihsyulcigbgjihmqafc.supabase.co';
 const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaHN5dWxjaWdiZ2ppaG1xYWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMzgxMjIsImV4cCI6MjEwOTgxNDEyMn0.gJnW41Ey6UF0LvNjCyR9sYyklNgtinWuncFJprPKIMY';
 
-// تجميع كل الروابط الـ 15 في قائمة واحدة لتدويرها
 const List<String> allAdUrls = [
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
@@ -65,12 +64,11 @@ class _SplashRouterState extends State<SplashRouter> {
     if (session == null) {
       _navigateTo(const AuthScreen());
     } else {
-      // 5 إعلانات عند كل دخول
       _navigateTo(AdsScreen(
         requiredAds: 5,
         title: 'أهلاً بك مجدداً!',
         description: 'لدعم استمرارية التطبيق، يرجى مشاهدة 5 إعلانات قصيرة لدخول التطبيق.',
-        onComplete: () => _navigateTo(const MainScreen()),
+        nextScreen: const MainScreen(),
       ));
     }
   }
@@ -88,14 +86,14 @@ class AdsScreen extends StatefulWidget {
   final int requiredAds;
   final String title;
   final String description;
-  final VoidCallback onComplete;
+  final Widget nextScreen;
 
   const AdsScreen({
     super.key,
     required this.requiredAds,
     required this.title,
     required this.description,
-    required this.onComplete,
+    required this.nextScreen,
   });
 
   @override
@@ -107,11 +105,15 @@ class _AdsScreenState extends State<AdsScreen> {
 
   Future<void> _watchAd() async {
     if (_adsWatched >= widget.requiredAds) return;
-    // تدوير الروابط لتجنب تكرار نفس الرابط
     final url = allAdUrls[_adsWatched % allAdUrls.length];
     if (await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
       setState(() => _adsWatched++);
     }
+  }
+
+  void _goToNextScreen() {
+    // الانتقال باستخدام سياق هذه الشاشة النشط
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => widget.nextScreen));
   }
 
   @override
@@ -140,7 +142,7 @@ class _AdsScreenState extends State<AdsScreen> {
                 )
               else
                 ElevatedButton.icon(
-                  onPressed: widget.onComplete,
+                  onPressed: _goToNextScreen,
                   icon: const Icon(Icons.check_circle),
                   label: const Text('تم! المتابعة'),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
@@ -186,15 +188,12 @@ class _AuthScreenState extends State<AuthScreen> {
         await Supabase.instance.client.auth.signUp(email: email, password: password);
       }
       if (mounted) {
-        // سواء كان تسجيل دخول أو حساب جديد، سيطلب 5 إعلانات
         Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (_) => AdsScreen(
             requiredAds: 5,
             title: _isLogin ? 'مرحباً بعودتك!' : 'تم إنشاء الحساب بنجاح',
             description: 'يرجى مشاهدة 5 إعلانات للدخول إلى التطبيق.',
-            onComplete: () {
-              Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
-            }
+            nextScreen: const MainScreen(),
           )
         ));
       }
@@ -478,7 +477,6 @@ class _MainScreenState extends State<MainScreen> {
             TextField(controller: shamController, decoration: const InputDecoration(labelText: 'رقم شام كاش')),
             const SizedBox(height: 15),
             
-            // قسم الإعلانات المطلوبة لفتح الرفع (10 إعلانات)
             if (uploadAdsWatched < 10)
               ElevatedButton.icon(
                 onPressed: () async {
