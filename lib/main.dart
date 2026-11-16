@@ -7,26 +7,18 @@ import 'package:url_launcher/url_launcher.dart';
 const String supabaseUrl = 'https://hihsyulcigbgjihmqafc.supabase.co';
 const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaHN5dWxjaWdiZ2ppaG1xYWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMzgxMjIsImV4cCI6MjEwOTgxNDEyMn0.gJnW41Ey6UF0LvNjCyR9sYyklNgtinWuncFJprPKIMY';
 
-// 5 روابط Smartlink
-const List<String> smartlinkUrls = [
+// تجميع كل الروابط الـ 15 في قائمة واحدة لتدويرها
+const List<String> allAdUrls = [
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
-];
-
-// 5 روابط Popunder
-const List<String> popunderUrls = [
   'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
   'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
   'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
   'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
   'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
-];
-
-// 5 روابط Social Bar
-const List<String> socialBarUrls = [
   'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
   'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
   'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
@@ -53,6 +45,7 @@ class NassemApp extends StatelessWidget {
   }
 }
 
+// ================= راوتر ذكي =================
 class SplashRouter extends StatefulWidget {
   const SplashRouter({super.key});
   @override
@@ -72,7 +65,13 @@ class _SplashRouterState extends State<SplashRouter> {
     if (session == null) {
       _navigateTo(const AuthScreen());
     } else {
-      _navigateTo(const EntryAdScreen());
+      // 5 إعلانات عند كل دخول
+      _navigateTo(AdsScreen(
+        requiredAds: 5,
+        title: 'أهلاً بك مجدداً!',
+        description: 'لدعم استمرارية التطبيق، يرجى مشاهدة 5 إعلانات قصيرة لدخول التطبيق.',
+        onComplete: () => _navigateTo(const MainScreen()),
+      ));
     }
   }
 
@@ -84,6 +83,77 @@ class _SplashRouterState extends State<SplashRouter> {
   Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
 }
 
+// ================= شاشة الإعلانات الموحدة =================
+class AdsScreen extends StatefulWidget {
+  final int requiredAds;
+  final String title;
+  final String description;
+  final VoidCallback onComplete;
+
+  const AdsScreen({
+    super.key,
+    required this.requiredAds,
+    required this.title,
+    required this.description,
+    required this.onComplete,
+  });
+
+  @override
+  State<AdsScreen> createState() => _AdsScreenState();
+}
+
+class _AdsScreenState extends State<AdsScreen> {
+  int _adsWatched = 0;
+
+  Future<void> _watchAd() async {
+    if (_adsWatched >= widget.requiredAds) return;
+    // تدوير الروابط لتجنب تكرار نفس الرابط
+    final url = allAdUrls[_adsWatched % allAdUrls.length];
+    if (await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
+      setState(() => _adsWatched++);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.monetization_on, size: 80, color: Colors.orange),
+              const SizedBox(height: 20),
+              Text(widget.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Text(widget.description, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+              const SizedBox(height: 30),
+              Text('$_adsWatched / ${widget.requiredAds}', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.teal)),
+              const SizedBox(height: 20),
+              if (_adsWatched < widget.requiredAds)
+                ElevatedButton.icon(
+                  onPressed: _watchAd,
+                  icon: const Icon(Icons.play_circle_fill),
+                  label: const Text('شاهد إعلان الآن'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
+                )
+              else
+                ElevatedButton.icon(
+                  onPressed: widget.onComplete,
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text('تم! المتابعة'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ================= شاشة تسجيل الدخول =================
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
   @override
@@ -99,7 +169,10 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submit() async {
     final username = _userController.text.trim();
     final password = _passController.text.trim();
-    if (username.isEmpty || password.isEmpty) return;
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال اسم المستخدم وكلمة المرور')));
+      return;
+    }
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('كلمة المرور يجب أن تكون 6 أحرف على الأقل'), backgroundColor: Colors.red));
       return;
@@ -112,7 +185,26 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         await Supabase.instance.client.auth.signUp(email: email, password: password);
       }
-      if (mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const EntryAdScreen()));
+      if (mounted) {
+        // سواء كان تسجيل دخول أو حساب جديد، سيطلب 5 إعلانات
+        Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => AdsScreen(
+            requiredAds: 5,
+            title: _isLogin ? 'مرحباً بعودتك!' : 'تم إنشاء الحساب بنجاح',
+            description: 'يرجى مشاهدة 5 إعلانات للدخول إلى التطبيق.',
+            onComplete: () {
+              Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
+            }
+          )
+        ));
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        String msg = e.message;
+        if (msg.contains('already registered')) msg = 'اسم المستخدم مسجل بالفعل';
+        else if (msg.contains('Invalid login credentials')) msg = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $msg'), backgroundColor: Colors.red));
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
     } finally {
@@ -154,66 +246,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-class EntryAdScreen extends StatefulWidget {
-  const EntryAdScreen({super.key});
-  @override
-  State<EntryAdScreen> createState() => _EntryAdScreenState();
-}
-
-class _EntryAdScreenState extends State<EntryAdScreen> {
-  int _adsWatched = 0;
-
-  Future<void> _watchAd() async {
-    if (_adsWatched >= 5) return;
-    final url = smartlinkUrls[_adsWatched % smartlinkUrls.length];
-    if (await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
-      setState(() => _adsWatched++);
-    }
-  }
-
-  void _finishOnboarding() {
-    if (mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.monetization_on, size: 80, color: Colors.orange),
-              const SizedBox(height: 20),
-              const Text('أهلاً بك مجدداً!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              const Text('لدعم استمرارية التطبيق، يرجى مشاهدة 5 إعلانات قصيرة لدخول التطبيق.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey)),
-              const SizedBox(height: 30),
-              Text('$_adsWatched / 5', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.teal)),
-              const SizedBox(height: 20),
-              if (_adsWatched < 5)
-                ElevatedButton.icon(
-                  onPressed: _watchAd,
-                  icon: const Icon(Icons.play_circle_fill),
-                  label: const Text('شاهد إعلان الآن'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
-                )
-              else
-                ElevatedButton.icon(
-                  onPressed: _finishOnboarding,
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text('تم! الدخول إلى التطبيق'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
+// ================= الشاشة الرئيسية =================
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
   @override
@@ -280,7 +313,15 @@ class _MainScreenState extends State<MainScreen> {
         'description': descController.text, 'phone_number': phoneController.text,
         'sham_cash_code': shamController.text, 'receipt_image_url': url, 'sham_cash_image_url': shamUrl,
       });
-      setState(() { uploadAdsWatched = 0; receiptImage = null; shamImage = null; amountController.clear(); descController.clear(); phoneController.clear(); shamController.clear(); });
+      setState(() { 
+        uploadAdsWatched = 0; 
+        receiptImage = null; 
+        shamImage = null; 
+        amountController.clear(); 
+        descController.clear(); 
+        phoneController.clear(); 
+        shamController.clear(); 
+      });
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الرفع بنجاح')));
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
@@ -436,17 +477,19 @@ class _MainScreenState extends State<MainScreen> {
             TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'رقم الهاتف')),
             TextField(controller: shamController, decoration: const InputDecoration(labelText: 'رقم شام كاش')),
             const SizedBox(height: 15),
-            if (uploadAdsWatched < 5)
+            
+            // قسم الإعلانات المطلوبة لفتح الرفع (10 إعلانات)
+            if (uploadAdsWatched < 10)
               ElevatedButton.icon(
                 onPressed: () async {
-                  if (uploadAdsWatched >= 5) return;
-                  final url = smartlinkUrls[uploadAdsWatched % smartlinkUrls.length];
+                  if (uploadAdsWatched >= 10) return;
+                  final url = allAdUrls[uploadAdsWatched % allAdUrls.length];
                   if (await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
                     setState(() => uploadAdsWatched++);
                   }
                 },
                 icon: const Icon(Icons.play_circle_fill),
-                label: Text('يجب مشاهدة 5 إعلانات لفتح الرفع ($uploadAdsWatched/5)'),
+                label: Text('يجب مشاهدة 10 إعلانات لفتح الرفع ($uploadAdsWatched/10)'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
               )
             else
@@ -455,34 +498,6 @@ class _MainScreenState extends State<MainScreen> {
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
                 child: isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text('رفع الفاتورة الآن'),
               ),
-            const SizedBox(height: 20),
-            const Divider(),
-            const Text('إعلانات الدعم الإضافية (اضغط للدعم)', style: TextStyle(fontSize: 14, color: Colors.grey)),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (int i = 0; i < 5; i++)
-                  ElevatedButton(
-                    onPressed: () => launchUrl(Uri.parse(socialBarUrls[i]), mode: LaunchMode.externalApplication),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.purple[50], foregroundColor: Colors.purple[900]),
-                    child: Text('Social ${i+1}'),
-                  ),
-                for (int i = 0; i < 5; i++)
-                  ElevatedButton(
-                    onPressed: () => launchUrl(Uri.parse(popunderUrls[i]), mode: LaunchMode.externalApplication),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[50], foregroundColor: Colors.blue[900]),
-                    child: Text('Pop ${i+1}'),
-                  ),
-                for (int i = 0; i < 5; i++)
-                  ElevatedButton(
-                    onPressed: () => launchUrl(Uri.parse(smartlinkUrls[i]), mode: LaunchMode.externalApplication),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green[50], foregroundColor: Colors.green[900]),
-                    child: Text('Smart ${i+1}'),
-                  ),
-              ],
-            )
           ],
         ),
       ),
@@ -490,6 +505,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
+// ================= شاشة الدردشة =================
 class ChatPage extends StatefulWidget {
   final Map<String, dynamic> bill;
   const ChatPage({super.key, required this.bill});
