@@ -3,12 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:adster_flutter_sdk/adster_flutter_sdk.dart';
 
 const String supabaseUrl = 'https://hihsyulcigbgjihmqafc.supabase.co';
 const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaHN5dWxjaWdiZ2ppaG1xYWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMzgxMjIsImV4cCI6MjEwOTgxNDEyMn0.gJnW41Ey6UF0LvNjCyR9sYyklNgtinWuncFJprPKIMY';
 
+// 5 روابط Smartlink
 const List<String> smartlinkUrls = [
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
@@ -17,6 +16,7 @@ const List<String> smartlinkUrls = [
   'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
 ];
 
+// 5 روابط Popunder
 const List<String> popunderUrls = [
   'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
   'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
@@ -25,6 +25,7 @@ const List<String> popunderUrls = [
   'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
 ];
 
+// 5 روابط Social Bar
 const List<String> socialBarUrls = [
   'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
   'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
@@ -32,8 +33,6 @@ const List<String> socialBarUrls = [
   'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
   'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
 ];
-
-const String interstitialPlacementName = 'adster_interstitial_test';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -100,10 +99,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submit() async {
     final username = _userController.text.trim();
     final password = _passController.text.trim();
-    if (username.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال اسم المستخدم وكلمة المرور')));
-      return;
-    }
+    if (username.isEmpty || password.isEmpty) return;
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('كلمة المرور يجب أن تكون 6 أحرف على الأقل'), backgroundColor: Colors.red));
       return;
@@ -117,13 +113,6 @@ class _AuthScreenState extends State<AuthScreen> {
         await Supabase.instance.client.auth.signUp(email: email, password: password);
       }
       if (mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const EntryAdScreen()));
-    } on AuthException catch (e) {
-      if (mounted) {
-        String msg = e.message;
-        if (msg.contains('already registered')) msg = 'اسم المستخدم مسجل بالفعل';
-        else if (msg.contains('Invalid login credentials')) msg = 'اسم المستخدم أو كلمة المرور غير صحيحة';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $msg'), backgroundColor: Colors.red));
-      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
     } finally {
@@ -240,35 +229,6 @@ class _MainScreenState extends State<MainScreen> {
   File? shamImage;
   bool isUploading = false;
   int uploadAdsWatched = 0;
-  final AdsterInterstitialAds _interstitialAd = AdsterInterstitialAds();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadInterstitial();
-  }
-
-  Future<void> _loadInterstitial() async {
-    try {
-      await _interstitialAd.loadAd(
-        adPlacementName: interstitialPlacementName,
-        callback: AdsterInterstitialAdsCallback(
-          onAdImpression: () => debugPrint("Interstitial impression"),
-          onAdClosed: () => debugPrint("Interstitial closed"),
-        ),
-      );
-    } catch (e) {
-      debugPrint("Error loading interstitial: $e");
-    }
-  }
-
-  Future<void> _showInterstitial() async {
-    try {
-      await _interstitialAd.showInterstitialAd();
-    } catch (e) {
-      debugPrint("Error showing interstitial: $e");
-    }
-  }
 
   @override
   void dispose() {
@@ -293,14 +253,6 @@ class _MainScreenState extends State<MainScreen> {
     );
     if (confirm == true) {
       try {
-        if (bill['receipt_image_url'] != null) {
-          final path = bill['receipt_image_url'].toString().split('/bills/').last;
-          await Supabase.instance.client.storage.from('bills').remove([path]);
-        }
-        if (bill['sham_cash_image_url'] != null) {
-          final path = bill['sham_cash_image_url'].toString().split('/bills/').last;
-          await Supabase.instance.client.storage.from('bills').remove([path]);
-        }
         await Supabase.instance.client.from('bills').delete().eq('id', bill['id']);
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الفاتورة بنجاح')));
       } catch (e) {
@@ -330,7 +282,6 @@ class _MainScreenState extends State<MainScreen> {
       });
       setState(() { uploadAdsWatched = 0; receiptImage = null; shamImage = null; amountController.clear(); descController.clear(); phoneController.clear(); shamController.clear(); });
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الرفع بنجاح')));
-      await _showInterstitial();
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
     } finally {
@@ -411,8 +362,7 @@ class _MainScreenState extends State<MainScreen> {
                             return Stack(
                               children: [
                                 ElevatedButton.icon(
-                                  onPressed: () async {
-                                    await _showInterstitial();
+                                  onPressed: () {
                                     Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(bill: bill)));
                                   },
                                   icon: Icon(isMyBill ? Icons.chat_bubble_outline : Icons.message),
