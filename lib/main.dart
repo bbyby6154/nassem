@@ -3,10 +3,37 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:adster_flutter_sdk/adster_flutter_sdk.dart';
 
 const String supabaseUrl = 'https://hihsyulcigbgjihmqafc.supabase.co';
 const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaHN5dWxjaWdiZ2ppaG1xYWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMzgxMjIsImV4cCI6MjEwOTgxNDEyMn0.gJnW41Ey6UF0LvNjCyR9sYyklNgtinWuncFJprPKIMY';
-const String adsterraSmartlink = 'https://asiafilm.org/4/d271823115ccad5281c9e633a6f6496e';
+
+const List<String> smartlinkUrls = [
+  'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
+  'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
+  'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
+  'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
+  'https://ardance.org/4/0320180c637c8a4dc8c382279f117071',
+];
+
+const List<String> popunderUrls = [
+  'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
+  'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
+  'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
+  'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
+  'https://accountut.com/1/8e30b2c158b35fa6bab0105bbebf1583',
+];
+
+const List<String> socialBarUrls = [
+  'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
+  'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
+  'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
+  'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
+  'https://bellnewyork.org/14/d190225b959a4f6a49ce2bf5d9337a1d',
+];
+
+const String interstitialPlacementName = 'adster_interstitial_test';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +54,6 @@ class NassemApp extends StatelessWidget {
   }
 }
 
-// راوتر ذكي يوجه المستخدم
 class SplashRouter extends StatefulWidget {
   const SplashRouter({super.key});
   @override
@@ -44,28 +70,21 @@ class _SplashRouterState extends State<SplashRouter> {
   Future<void> _checkStatus() async {
     await Future.delayed(const Duration(seconds: 1));
     final session = Supabase.instance.client.auth.currentSession;
-    
     if (session == null) {
       _navigateTo(const AuthScreen());
     } else {
-      // الدخول الإجباري للإعلانات في كل مرة يفتح فيها التطبيق
       _navigateTo(const EntryAdScreen());
     }
   }
 
   void _navigateTo(Widget page) {
-    if (mounted) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => page));
-    }
+    if (mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => page));
   }
 
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
-  }
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
 }
 
-// ================= شاشة تسجيل الدخول =================
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
   @override
@@ -81,7 +100,6 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submit() async {
     final username = _userController.text.trim();
     final password = _passController.text.trim();
-    
     if (username.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال اسم المستخدم وكلمة المرور')));
       return;
@@ -90,21 +108,15 @@ class _AuthScreenState extends State<AuthScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('كلمة المرور يجب أن تكون 6 أحرف على الأقل'), backgroundColor: Colors.red));
       return;
     }
-
     final email = '$username@nassem.com';
     setState(() => _isLoading = true);
-
     try {
       if (_isLogin) {
         await Supabase.instance.client.auth.signInWithPassword(email: email, password: password);
       } else {
         await Supabase.instance.client.auth.signUp(email: email, password: password);
       }
-      
-      if (mounted) {
-        // التوجه لشاشة الإعلانات بعد التسجيل مباشرة
-        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const EntryAdScreen()));
-      }
+      if (mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const EntryAdScreen()));
     } on AuthException catch (e) {
       if (mounted) {
         String msg = e.message;
@@ -153,7 +165,6 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-// ================= شاشة الإعلانات الإجبارية (عند كل دخول) =================
 class EntryAdScreen extends StatefulWidget {
   const EntryAdScreen({super.key});
   @override
@@ -164,17 +175,15 @@ class _EntryAdScreenState extends State<EntryAdScreen> {
   int _adsWatched = 0;
 
   Future<void> _watchAd() async {
-    if (_adsWatched >= 5) return; 
-    final Uri url = Uri.parse(adsterraSmartlink);
-    if (await launchUrl(url, mode: LaunchMode.externalApplication)) {
+    if (_adsWatched >= 5) return;
+    final url = smartlinkUrls[_adsWatched % smartlinkUrls.length];
+    if (await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
       setState(() => _adsWatched++);
     }
   }
 
   void _finishOnboarding() {
-    if (mounted) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
-    }
+    if (mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
   }
 
   @override
@@ -216,7 +225,6 @@ class _EntryAdScreenState extends State<EntryAdScreen> {
   }
 }
 
-// ================= الشاشة الرئيسية =================
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
   @override
@@ -232,6 +240,35 @@ class _MainScreenState extends State<MainScreen> {
   File? shamImage;
   bool isUploading = false;
   int uploadAdsWatched = 0;
+  final AdsterInterstitialAds _interstitialAd = AdsterInterstitialAds();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInterstitial();
+  }
+
+  Future<void> _loadInterstitial() async {
+    try {
+      await _interstitialAd.loadAd(
+        adPlacementName: interstitialPlacementName,
+        callback: AdsterInterstitialAdsCallback(
+          onAdImpression: () => debugPrint("Interstitial impression"),
+          onAdClosed: () => debugPrint("Interstitial closed"),
+        ),
+      );
+    } catch (e) {
+      debugPrint("Error loading interstitial: $e");
+    }
+  }
+
+  Future<void> _showInterstitial() async {
+    try {
+      await _interstitialAd.showInterstitialAd();
+    } catch (e) {
+      debugPrint("Error showing interstitial: $e");
+    }
+  }
 
   @override
   void dispose() {
@@ -254,10 +291,8 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
     );
-
     if (confirm == true) {
       try {
-        // 1. حذف الصور من التخزين (إن وجدت)
         if (bill['receipt_image_url'] != null) {
           final path = bill['receipt_image_url'].toString().split('/bills/').last;
           await Supabase.instance.client.storage.from('bills').remove([path]);
@@ -266,13 +301,40 @@ class _MainScreenState extends State<MainScreen> {
           final path = bill['sham_cash_image_url'].toString().split('/bills/').last;
           await Supabase.instance.client.storage.from('bills').remove([path]);
         }
-        
-        // 2. حذف السجل من قاعدة البيانات (سيحذف المحادثات المرتبطة به تلقائياً)
         await Supabase.instance.client.from('bills').delete().eq('id', bill['id']);
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الفاتورة بنجاح')));
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ في الحذف: $e')));
       }
+    }
+  }
+
+  Future<void> _uploadBill() async {
+    if (receiptImage == null || amountController.text.isEmpty) return;
+    setState(() => isUploading = true);
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      final path = '${user!.id}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await Supabase.instance.client.storage.from('bills').upload(path, receiptImage!);
+      final url = Supabase.instance.client.storage.from('bills').getPublicUrl(path);
+      String? shamUrl;
+      if (shamImage != null) {
+        final shamPath = '${user.id}/sham_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        await Supabase.instance.client.storage.from('bills').upload(shamPath, shamImage!);
+        shamUrl = Supabase.instance.client.storage.from('bills').getPublicUrl(shamPath);
+      }
+      await Supabase.instance.client.from('bills').insert({
+        'user_id': user.id, 'amount': double.parse(amountController.text),
+        'description': descController.text, 'phone_number': phoneController.text,
+        'sham_cash_code': shamController.text, 'receipt_image_url': url, 'sham_cash_image_url': shamUrl,
+      });
+      setState(() { uploadAdsWatched = 0; receiptImage = null; shamImage = null; amountController.clear(); descController.clear(); phoneController.clear(); shamController.clear(); });
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الرفع بنجاح')));
+      await _showInterstitial();
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+    } finally {
+      setState(() => isUploading = false);
     }
   }
 
@@ -290,13 +352,10 @@ class _MainScreenState extends State<MainScreen> {
             ],
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white),
-              onPressed: () async {
-                await Supabase.instance.client.auth.signOut();
-                if (context.mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AuthScreen()));
-              },
-            )
+            IconButton(icon: const Icon(Icons.logout, color: Colors.white), onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (context.mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AuthScreen()));
+            }),
           ],
         ),
         body: TabBarView(
@@ -312,32 +371,22 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildBillsList({required bool showAll}) {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     final stream = Supabase.instance.client.from('bills').stream(primaryKey: ['id']).order('created_at', ascending: false);
-
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: stream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        
         List<Map<String, dynamic>> allBills = snapshot.data!;
-        List<Map<String, dynamic>> bills = showAll 
-            ? allBills 
-            : allBills.where((bill) => bill['user_id'] == userId).toList();
-        
+        List<Map<String, dynamic>> bills = showAll ? allBills : allBills.where((bill) => bill['user_id'] == userId).toList();
         if (bills.isEmpty && showAll) return const Center(child: Text('لا توجد فواتير حالياً.'));
         if (bills.isEmpty && !showAll) return _buildUploadCard();
-
         return ListView.builder(
           padding: const EdgeInsets.all(8),
           itemCount: bills.length + (!showAll ? 1 : 0),
           itemBuilder: (context, index) {
-            if (!showAll && index == 0) {
-              return _buildUploadCard();
-            }
-            
+            if (!showAll && index == 0) return _buildUploadCard();
             final billIndex = showAll ? index : index - 1;
             final bill = bills[billIndex];
             final isMyBill = bill['user_id'] == userId;
-
             return Card(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -349,18 +398,12 @@ class _MainScreenState extends State<MainScreen> {
                       title: Text('المبلغ: ${bill['amount']} ل.س', style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text('الحالة: ${bill['description'] ?? "غير محدد"}\nالهاتف: ${bill['phone_number'] ?? "غير متوفر"}'),
                       isThreeLine: true,
-                      trailing: isMyBill 
-                        ? IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _deleteBill(bill),
-                          )
-                        : null,
+                      trailing: isMyBill ? IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteBill(bill)) : null,
                     ),
                     const Divider(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // التحقق من وجود رسائل لعرض الإشعار (Badge)
                         FutureBuilder(
                           future: Supabase.instance.client.from('chats').select('id').eq('bill_id', bill['id']).limit(1),
                           builder: (context, snapshot) {
@@ -368,7 +411,8 @@ class _MainScreenState extends State<MainScreen> {
                             return Stack(
                               children: [
                                 ElevatedButton.icon(
-                                  onPressed: () {
+                                  onPressed: () async {
+                                    await _showInterstitial();
                                     Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(bill: bill)));
                                   },
                                   icon: Icon(isMyBill ? Icons.chat_bubble_outline : Icons.message),
@@ -379,28 +423,13 @@ class _MainScreenState extends State<MainScreen> {
                                   ),
                                 ),
                                 if (hasMessages)
-                                  Positioned(
-                                    right: 0,
-                                    top: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.mark_chat_unread, color: Colors.white, size: 12),
-                                    ),
-                                  )
+                                  Positioned(right: 0, top: 0, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: const Icon(Icons.mark_chat_unread, color: Colors.white, size: 12))),
                               ],
                             );
                           }
                         ),
                         if (bill['phone_number'] != null && bill['phone_number'].toString().isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.call, color: Colors.teal),
-                            onPressed: () => launchUrl(Uri.parse('tel:${bill['phone_number']}')),
-                            tooltip: 'اتصال هاتفي',
-                          )
+                          IconButton(icon: const Icon(Icons.call, color: Colors.teal), onPressed: () => launchUrl(Uri.parse('tel:${bill['phone_number']}')), tooltip: 'اتصال هاتفي'),
                       ],
                     )
                   ],
@@ -457,13 +486,12 @@ class _MainScreenState extends State<MainScreen> {
             TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'رقم الهاتف')),
             TextField(controller: shamController, decoration: const InputDecoration(labelText: 'رقم شام كاش')),
             const SizedBox(height: 15),
-            
             if (uploadAdsWatched < 5)
               ElevatedButton.icon(
                 onPressed: () async {
                   if (uploadAdsWatched >= 5) return;
-                  final Uri url = Uri.parse(adsterraSmartlink);
-                  if (await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                  final url = smartlinkUrls[uploadAdsWatched % smartlinkUrls.length];
+                  if (await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
                     setState(() => uploadAdsWatched++);
                   }
                 },
@@ -473,48 +501,38 @@ class _MainScreenState extends State<MainScreen> {
               )
             else
               ElevatedButton(
-                onPressed: isUploading ? null : () async {
-                  if (receiptImage == null || amountController.text.isEmpty) return;
-                  setState(() => isUploading = true);
-                  try {
-                    final user = Supabase.instance.client.auth.currentUser;
-                    final path = '${user!.id}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-                    await Supabase.instance.client.storage.from('bills').upload(path, receiptImage!);
-                    final url = Supabase.instance.client.storage.from('bills').getPublicUrl(path);
-
-                    String? shamUrl;
-                    if (shamImage != null) {
-                      final shamPath = '${user.id}/sham_${DateTime.now().millisecondsSinceEpoch}.jpg';
-                      await Supabase.instance.client.storage.from('bills').upload(shamPath, shamImage!);
-                      shamUrl = Supabase.instance.client.storage.from('bills').getPublicUrl(shamPath);
-                    }
-
-                    await Supabase.instance.client.from('bills').insert({
-                      'user_id': user.id, 'amount': double.parse(amountController.text),
-                      'description': descController.text, 'phone_number': phoneController.text,
-                      'sham_cash_code': shamController.text, 'receipt_image_url': url, 'sham_cash_image_url': shamUrl,
-                    });
-                    
-                    setState(() { 
-                      uploadAdsWatched = 0; 
-                      receiptImage = null; 
-                      shamImage = null; 
-                      amountController.clear(); 
-                      descController.clear(); 
-                      phoneController.clear(); 
-                      shamController.clear();
-                    });
-                    
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الرفع بنجاح')));
-                  } catch (e) {
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
-                  } finally {
-                    setState(() => isUploading = false);
-                  }
-                },
+                onPressed: isUploading ? null : _uploadBill,
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
                 child: isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text('رفع الفاتورة الآن'),
               ),
+            const SizedBox(height: 20),
+            const Divider(),
+            const Text('إعلانات الدعم الإضافية (اضغط للدعم)', style: TextStyle(fontSize: 14, color: Colors.grey)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (int i = 0; i < 5; i++)
+                  ElevatedButton(
+                    onPressed: () => launchUrl(Uri.parse(socialBarUrls[i]), mode: LaunchMode.externalApplication),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.purple[50], foregroundColor: Colors.purple[900]),
+                    child: Text('Social ${i+1}'),
+                  ),
+                for (int i = 0; i < 5; i++)
+                  ElevatedButton(
+                    onPressed: () => launchUrl(Uri.parse(popunderUrls[i]), mode: LaunchMode.externalApplication),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[50], foregroundColor: Colors.blue[900]),
+                    child: Text('Pop ${i+1}'),
+                  ),
+                for (int i = 0; i < 5; i++)
+                  ElevatedButton(
+                    onPressed: () => launchUrl(Uri.parse(smartlinkUrls[i]), mode: LaunchMode.externalApplication),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green[50], foregroundColor: Colors.green[900]),
+                    child: Text('Smart ${i+1}'),
+                  ),
+              ],
+            )
           ],
         ),
       ),
@@ -522,7 +540,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// ================= شاشة الدردشة =================
 class ChatPage extends StatefulWidget {
   final Map<String, dynamic> bill;
   const ChatPage({super.key, required this.bill});
@@ -576,19 +593,15 @@ class _ChatPageState extends State<ChatPage> {
               stream: Supabase.instance.client.from('chats').stream(primaryKey: ['id']).order('created_at'),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                
                 List<Map<String, dynamic>> allMessages = snapshot.data!;
                 final messages = allMessages.where((msg) => msg['bill_id'] == widget.bill['id']).toList();
-
                 if (messages.isEmpty) return const Center(child: Text('لا توجد رسائل بعد. ابدأ المحادثة!'));
-
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
                     final isMe = msg['sender_id'] == currentUserId;
-                    
                     return Align(
                       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
@@ -613,10 +626,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, -2))],
-            ),
+            decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5, offset: const Offset(0, -2))]),
             child: Row(
               children: [
                 Expanded(
@@ -635,10 +645,7 @@ class _ChatPageState extends State<ChatPage> {
                 const SizedBox(width: 8),
                 CircleAvatar(
                   backgroundColor: Colors.teal,
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                    onPressed: _sendMessage,
-                  ),
+                  child: IconButton(icon: const Icon(Icons.send, color: Colors.white, size: 20), onPressed: _sendMessage),
                 ),
               ],
             ),
